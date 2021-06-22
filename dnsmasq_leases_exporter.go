@@ -6,17 +6,19 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 )
 
 var (
-	listen = flag.String("listen",
+	listenArg = flag.String("listen",
 		"0.0.0.0:9154",
 		"Address to listen on")
 
-	leasesPath = flag.String("leases_path",
+	leasesPathArg = flag.String("leases_path",
 		"/var/lib/misc/dnsmasq.leases",
 		"Path to dnsmasq leases file")
 )
@@ -30,6 +32,7 @@ type Lease struct {
 }
 
 func leaseFromText(text string) (*Lease, error) {
+	// Parse line of text in leases file format and return Lease struct
 	scanner := bufio.NewScanner(strings.NewReader(text))
 	scanner.Split(bufio.ScanWords)
 
@@ -70,6 +73,7 @@ func leaseFromText(text string) (*Lease, error) {
 }
 
 func parseLeasesFile(fileUrl *string) ([]Lease, error) {
+	// Parse given file line by line and return slice of Lease structs for each line that could be parsed
 	var leases []Lease
 	f, err := os.Open(*fileUrl)
 
@@ -94,6 +98,7 @@ func parseLeasesFile(fileUrl *string) ([]Lease, error) {
 }
 
 func encodeLeasesToJson(leases []Lease) (string, error) {
+	// build json string from slice of Lease structs
 	b, err := json.Marshal(leases)
 	if err == nil {
 		return string(b), nil
@@ -101,8 +106,41 @@ func encodeLeasesToJson(leases []Lease) (string, error) {
 	return "", err
 }
 
+type server struct {
+	listen     string
+	leasesPath string
+}
+
+func (s *server) leasesHandler(w http.ResponseWriter, r *http.Request) {
+	leases, err := parseLeasesFile(&s.leasesPath)
+	if err != nil {
+		fmt.Printf("Error delivering leases:\n%s\n\n", err)
+		http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := encodeLeasesToJson(leases)
+
+	if err != nil {
+		fmt.Printf("Error delivering leases:\n%s\n\n", err)
+		http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprint(w, resp)
+}
+
 func main() {
 	flag.Parse()
 
-	fmt.Println("Listening on ", *listen)
+	s := &server{
+		listen:     *listenArg,
+		leasesPath: *leasesPathArg,
+	}
+
+	http.HandleFunc("/leases", s.leasesHandler)
+
+	log.Println("Listening on ", s.listen)
+	log.Println("Serving leases from ", s.leasesPath)
+	log.Fatal(http.ListenAndServe(s.listen, nil))
 }
