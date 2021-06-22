@@ -10,4 +10,4 @@ FROM scratch
 WORKDIR /app
 COPY --from=build-stage /src/dnsmasq_leases_exporter /app/
 USER 65534
-ENTRYPOINT ["/app/dnsmasq_leases_exporter", "-leases_path", "test/dnsmasq.leases"]
+ENTRYPOINT ["/app/dnsmasq_leases_exporter"]
