@@ -21,6 +21,10 @@ var (
 	leasesPathArg = flag.String("leases_path",
 		"/var/lib/misc/dnsmasq.leases",
 		"Path to dnsmasq leases file")
+
+	corsArg = flag.Bool("allow_cors",
+		true,
+		"Allow CORS for leases request")
 )
 
 type Lease struct {
@@ -127,7 +131,23 @@ func (s *server) leasesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if (*corsArg) == true {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+	}
+
 	fmt.Fprint(w, resp)
+}
+
+func (s *server) indexHandler(w http.ResponseWriter, r *http.Request) {
+	//rw.Header().Set("Content-Type", "application/json")
+	//w.Header().Set("Access-Control-Allow-Origin", "*")
+	//w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	//w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+	//if r.Method == "OPTIONS" {
+	//	w.WriteHeader(http.StatusOK)
+	//	return
+	//}
+	w.Write([]byte("Hello, World!"))
 }
 
 func main() {
@@ -139,6 +159,7 @@ func main() {
 	}
 
 	http.HandleFunc("/leases", s.leasesHandler)
+	http.HandleFunc("/", s.indexHandler)
 
 	log.Println("Listening on ", s.listen)
 	log.Println("Serving leases from ", s.leasesPath)
